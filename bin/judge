@@ -21,7 +21,12 @@ ROOT = File.expand_path("..", __dir__)
 PRIVATE_DIR = GolfSandbox.private_dir
 TIME_LIMIT = Float(ENV.fetch("GOLF_TIME_LIMIT", "5"))
 
-def normalize(s) = s.dup.force_encoding(Encoding::UTF_8).scrub.lines.map(&:rstrip).join("\n").rstrip
+def utf8(s)
+  str = s.to_s.dup.force_encoding(Encoding::UTF_8)
+  str.valid_encoding? ? str : str.scrub
+end
+
+def normalize(s) = utf8(s).lines.map(&:rstrip).join("\n").rstrip
 
 def score(path) = File.binread(path).delete_suffix("\n").bytesize
 
@@ -76,7 +81,8 @@ else
     puts "    input:    #{r[:input].inspect[0, 300]}"
     puts "    expected: #{normalize(r[:expected]).inspect[0, 300]}"
     puts "    actual:   #{normalize(r[:actual]).inspect[0, 300]}"
-    puts "    stderr:   #{r[:stderr].lines.first(3).join.strip}" unless r[:stderr].empty?
+    err = utf8(r[:stderr])
+    puts "    stderr:   #{err.lines.first(3).join.strip}" unless err.empty?
   end
   puts
   puts "#{slug}: #{passed}/#{results.size} passed"
