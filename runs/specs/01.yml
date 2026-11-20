@@ -1,0 +1,9 @@
+# 問題 01 を、隔離した Claude Code に 30 分まで解かせる。
+# トークンはここに書かない。CLAUDE_CODE_OAUTH_TOKEN を環境変数で渡す。
+problem: "01"
+time_limit: 30m
+silence_limit: 5m
+show_target: false
+# model: claude-sonnet-4-5
+# prompt: |
+#   CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の解答を answer.rb に書いて
