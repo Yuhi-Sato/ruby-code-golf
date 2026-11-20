@@ -1,0 +1,7 @@
+id: '02'
+slug: 02-ruler
+title: 定規
+difficulty: 1
+target_bytes: 69
+target_source: reference
+time_limit_per_case_sec: 5

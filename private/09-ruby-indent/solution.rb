@@ -1,0 +1,1 @@
+l=0;$<.map{|s|s.strip!;l-=1if s=~/^end\b/;puts"  "*(s=~/^(else|elsif|when|rescue|ensure)\b/?l-1:l)+s;l+=1if s=~/^(def|class|module|if|unless|while|until|case|begin)\b|\bdo( \|.*\|)?$/}

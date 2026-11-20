@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+Encoding.default_external = Encoding::UTF_8
+
+# Usage: judge <problem> <solution.rb> [--json] [--verbose]
+#   e.g. judge 01 answer.rb
+#
+# 公開サンプル (problems/<id>/samples) と非公開テスト (private/<id>/tests) で解答を採点します。
+# - サンプルが失敗したときは、期待出力と実際の出力を表示します。
+# - 非公開テストは合否と失敗の種類だけを表示し、入力や期待出力は表示しません（--verbose で表示）。
+# - 全ケース正解のときだけバイト数を表示します。
+#
+# 非公開テストの場所は環境変数 GOLF_PRIVATE_DIR で変えられます（既定: <repo>/private）。
+
+require "json"
+require "open3"
+require "tmpdir"
+require "rbconfig"
+
+ROOT = File.expand_path("..", __dir__)
+PRIVATE_DIR = ENV.fetch("GOLF_PRIVATE_DIR", File.join(ROOT, "private"))
+TIME_LIMIT = Float(ENV.fetch("GOLF_TIME_LIMIT", "5"))
+CHILD_ENV = { "LANG" => "C.UTF-8", "LC_ALL" => "C.UTF-8", "RUBYOPT" => nil }
+
+def normalize(s) = s.dup.force_encoding(Encoding::UTF_8).scrub.lines.map(&:rstrip).join("\n").rstrip
+
+def score(path) = File.binread(path).delete_suffix("\n").bytesize
+
+# 解答を実行する。標準入力だけを渡し、作業ディレクトリは空の一時ディレクトリにする。
+def run(solution, input)
+  Dir.mktmpdir("golf-run") do |tmp|
+    Open3.popen3(CHILD_ENV, RbConfig.ruby, solution, chdir: tmp, pgroup: true) do |stdin, stdout, stderr, th|
+      out_reader = Thread.new { stdout.read }
+      err_reader = Thread.new { stderr.read }
+      begin
+        stdin.write(input)
+      rescue Errno::EPIPE
+        nil
+      end
+      stdin.close
+      unless th.join(TIME_LIMIT)
+        Process.kill("KILL", -th.pid) rescue nil
+        th.join
+        return [:timeout, "", ""]
+      end
+      [th.value.success? ? :ok : :runtime_error, out_reader.value, err_reader.value]
+    end
+  end
+end
+
+args = ARGV.reject { _1.start_with?("--") }
+json = ARGV.include?("--json")
+verbose = ARGV.include?("--verbose")
+problem, solution = args
+abort "Usage: judge <problem> <solution.rb> [--json] [--verbose]" unless problem && solution
+abort "No such file: #{solution}" unless File.file?(solution)
+solution = File.expand_path(solution)
+
+public_dir = Dir[File.join(ROOT, "problems", "#{problem}*")].first
+abort "No such problem: #{problem}" unless public_dir
+slug = File.basename(public_dir)
+
+cases = Dir[File.join(public_dir, "samples", "*.in")].sort.map { [:sample, _1] } +
+        Dir[File.join(PRIVATE_DIR, slug, "tests", "*.in")].sort.map { [:hidden, _1] }
+abort "No test cases found for #{slug}" if cases.none? { _1[0] == :hidden }
+
+results = cases.map do |kind, input_path|
+  name = File.basename(input_path, ".in")
+  input = File.read(input_path)
+  expected = File.read(input_path.sub(/\.in\z/, ".out"))
+  status, actual, err = run(solution, input)
+  status = :wrong_answer if status == :ok && normalize(actual) != normalize(expected)
+  status = :accepted if status == :ok
+  { name:, kind:, status:, input:, expected:, actual:, stderr: err }
+end
+
+passed = results.count { _1[:status] == :accepted }
+accepted = passed == results.size
+bytes = score(solution)
+
+if json
+  puts JSON.generate(
+    problem: slug, accepted:, passed:, total: results.size, bytes: accepted ? bytes : nil,
+    cases: results.map { { name: _1[:name], kind: _1[:kind], status: _1[:status] } },
+  )
+else
+  results.each do |r|
+    label = r[:kind] == :sample ? r[:name] : "hidden/#{r[:name]}"
+    if r[:status] == :accepted
+      puts "  PASS #{label}"
+      next
+    end
+    puts "  FAIL #{label} (#{r[:status]})"
+    next unless r[:kind] == :sample || verbose
+
+    puts "    input:    #{r[:input].inspect[0, 300]}"
+    puts "    expected: #{normalize(r[:expected]).inspect[0, 300]}"
+    puts "    actual:   #{normalize(r[:actual]).inspect[0, 300]}"
+    puts "    stderr:   #{r[:stderr].lines.first(3).join.strip}" unless r[:stderr].empty?
+  end
+  puts
+  puts "#{slug}: #{passed}/#{results.size} passed"
+  puts accepted ? "Score: #{bytes} bytes" : "Not accepted (#{bytes} bytes)"
+end
+exit(accepted ? 0 : 1)

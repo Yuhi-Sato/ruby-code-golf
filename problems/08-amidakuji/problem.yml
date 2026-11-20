@@ -1,0 +1,7 @@
+id: '08'
+slug: '08-amidakuji'
+title: あみだくじ
+difficulty: 2
+target_bytes: 65
+target_source: reference
+time_limit_per_case_sec: 5

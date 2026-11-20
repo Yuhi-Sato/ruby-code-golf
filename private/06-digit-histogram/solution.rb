@@ -1,0 +1,1 @@
+s=gets;c=(?0..?9).map{s.count _1};c.max.downto(1){|h|puts c.map{_1<h ?" ":?#}*""};puts [*0..9]*""

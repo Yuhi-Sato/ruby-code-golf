@@ -1,1 +1,0 @@
-h={};q=nil;$<.map{|w|w.chomp!;(q&&q[-1]!=w[0]||h[w]||w[-1]==?n)&&(p$.;exit);h[w]=q=w};p 0

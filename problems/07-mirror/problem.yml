@@ -1,0 +1,7 @@
+id: '07'
+slug: 07-mirror
+title: 鏡文字
+difficulty: 2
+target_bytes: 110
+target_source: reference
+time_limit_per_case_sec: 5

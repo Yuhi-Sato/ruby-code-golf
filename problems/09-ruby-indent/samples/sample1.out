@@ -1,0 +1,9 @@
+def hi(xs)
+  xs.each do |x|
+    if x
+      puts x
+    else
+      puts 0
+    end
+  end
+end

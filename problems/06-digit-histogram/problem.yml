@@ -1,0 +1,7 @@
+id: '06'
+slug: 06-digit-histogram
+title: 数字ヒストグラム
+difficulty: 2
+target_bytes: 97
+target_source: reference
+time_limit_per_case_sec: 5

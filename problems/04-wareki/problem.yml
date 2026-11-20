@@ -1,0 +1,7 @@
+id: '04'
+slug: 04-wareki
+title: 和暦
+difficulty: 2
+target_bytes: 176
+target_source: reference
+time_limit_per_case_sec: 5

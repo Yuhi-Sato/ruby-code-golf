@@ -1,0 +1,7 @@
+id: '05'
+slug: 05-shiritori
+title: しりとり審判
+difficulty: 2
+target_bytes: 75
+target_source: reference
+time_limit_per_case_sec: 5

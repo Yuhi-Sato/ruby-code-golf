@@ -1,0 +1,7 @@
+id: '03'
+slug: 03-version-sort
+title: バージョンソート
+difficulty: 1
+target_bytes: 39
+target_source: reference
+time_limit_per_case_sec: 5

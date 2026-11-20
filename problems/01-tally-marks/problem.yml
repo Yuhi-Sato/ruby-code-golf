@@ -1,0 +1,7 @@
+id: '01'
+slug: 01-tally-marks
+title: 正の字
+difficulty: 1
+target_bytes: 56
+target_source: reference
+time_limit_per_case_sec: 5

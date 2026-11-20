@@ -1,0 +1,7 @@
+id: '09'
+slug: '09-ruby-indent'
+title: Ruby インデント整形
+difficulty: 3
+target_bytes: 184
+target_source: reference
+time_limit_per_case_sec: 5

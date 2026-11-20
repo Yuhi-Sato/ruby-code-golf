@@ -1,0 +1,7 @@
+id: '10'
+slug: 10-box-drawing
+title: 罫線化
+difficulty: 3
+target_bytes: 168
+target_source: reference
+time_limit_per_case_sec: 5

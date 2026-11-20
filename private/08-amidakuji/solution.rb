@@ -1,0 +1,1 @@
+s=gets;$<.map{_1.scan(?-){s[i=$`.size-1,3]=s[i,3].reverse}};$><<s

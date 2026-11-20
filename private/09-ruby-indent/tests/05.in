@@ -1,0 +1,16 @@
+  endpoint = "/api"
+     if_flag = true
+    doc = "do"
+    unless endpoint.empty?
+  until if_flag
+     if_flag = [1, 2].map { |x| x * 2 }.any?
+   end
+     [3, 4].each_with_index do |a, b|
+   p a, b
+  end
+     end
+
+  case doc
+     when "do"
+      puts "ok"
+     end
