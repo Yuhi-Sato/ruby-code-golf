@@ -12,42 +12,21 @@ Encoding.default_external = Encoding::UTF_8
 # - 全ケース正解のときだけバイト数を表示します。
 #
 # 非公開テストの場所は環境変数 GOLF_PRIVATE_DIR で変えられます（既定: <repo>/private）。
+# 解答はサンドボックスの中で実行し、リポジトリと非公開テストは見えません（GOLF_SANDBOX、lib/golf_sandbox.rb 参照）。
 
 require "json"
-require "open3"
-require "tmpdir"
-require "rbconfig"
+require_relative "../lib/golf_sandbox"
 
 ROOT = File.expand_path("..", __dir__)
-PRIVATE_DIR = ENV.fetch("GOLF_PRIVATE_DIR", File.join(ROOT, "private"))
+PRIVATE_DIR = GolfSandbox.private_dir
 TIME_LIMIT = Float(ENV.fetch("GOLF_TIME_LIMIT", "5"))
-CHILD_ENV = { "LANG" => "C.UTF-8", "LC_ALL" => "C.UTF-8", "RUBYOPT" => nil }
 
 def normalize(s) = s.dup.force_encoding(Encoding::UTF_8).scrub.lines.map(&:rstrip).join("\n").rstrip
 
 def score(path) = File.binread(path).delete_suffix("\n").bytesize
 
-# 解答を実行する。標準入力だけを渡し、作業ディレクトリは空の一時ディレクトリにする。
-def run(solution, input)
-  Dir.mktmpdir("golf-run") do |tmp|
-    Open3.popen3(CHILD_ENV, RbConfig.ruby, solution, chdir: tmp, pgroup: true) do |stdin, stdout, stderr, th|
-      out_reader = Thread.new { stdout.read }
-      err_reader = Thread.new { stderr.read }
-      begin
-        stdin.write(input)
-      rescue Errno::EPIPE
-        nil
-      end
-      stdin.close
-      unless th.join(TIME_LIMIT)
-        Process.kill("KILL", -th.pid) rescue nil
-        th.join
-        return [:timeout, "", ""]
-      end
-      [th.value.success? ? :ok : :runtime_error, out_reader.value, err_reader.value]
-    end
-  end
-end
+# 解答を隔離して実行する（lib/golf_sandbox.rb）。標準入力だけを渡す。
+def run(solution, input) = GolfSandbox.run_file(solution, input, time_limit: TIME_LIMIT)
 
 args = ARGV.reject { _1.start_with?("--") }
 json = ARGV.include?("--json")

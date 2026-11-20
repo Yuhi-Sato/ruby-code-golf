@@ -51,7 +51,8 @@ Score: 56 bytes
 
 - 公開サンプルが失敗したときは、期待出力と実際の出力を表示します。
 - 非公開テストは、合否と失敗の種類（`wrong_answer` / `runtime_error` / `timeout`）だけを表示します。
-- 解答は空の一時ディレクトリで、標準入力だけを渡して実行します。制限時間を超えるとプロセスごと止めます。
+- 解答はサンドボックスの中で、標準入力だけを渡して実行します。制限時間を超えるとプロセスごと止めます。
+- Linux は bubblewrap、macOS は sandbox-exec が必要です。無い場合は `GOLF_SANDBOX=off` で隔離なしで動かせます。
 
 ## エージェント評価用の作業ディレクトリ
 
@@ -63,20 +64,51 @@ ruby tools/export_workspace.rb 01 /tmp/golf-ws-01 [--show-target]
 
 ```
 /tmp/golf-ws-01/
-├── PROBLEM.md      # 問題文（--show-target で目標バイト数を追記）
-├── CONDITIONS.md   # 競技条件
-├── samples/        # 公開サンプル
-└── judge           # ./judge answer.rb で bin/judge を呼ぶラッパー
+├── PROBLEM.md              # 問題文（--show-target で目標バイト数を追記）
+├── CONDITIONS.md           # 競技条件
+├── samples/                # 公開サンプル
+└── judge                   # 人間用の採点ラッパー（./judge answer.rb）
+
+/tmp/golf-ws-01-claude/     # エージェントの起動設定（作業ディレクトリの外。--run-dir で変更可）
+├── settings.json           # 権限設定（--settings で渡す）
+└── golf-mcp.json           # MCP サーバー judge / run_ruby（--mcp-config で渡す）
 ```
 
 非公開テストと参考解はコピーしません。
 
-**注意:** 今の時点では、解答プログラムはジャッジと同じユーザー権限で動きます。
-そのため、解答が `private/` を直接読めば非公開テストを盗み見られます。
-エージェントを回すときは、ランナー側で次のどちらかの対策が必要です（ステップ3で対応予定）。
+起動設定を作業ディレクトリの外に置くのは、Claude Code が「信頼していない作業ディレクトリ」の `.claude/settings.json` の allow を無視するためです（deny は効きます）。`--settings` で渡したファイルなら allow も deny も両方効くことを、デバッグログで確かめました。
 
-- Claude Code の権限設定で、このリポジトリへのアクセスを `./judge` 以外すべて拒否する
-- ジャッジを別ユーザーやサンドボックス（コンテナ、bubblewrap など）で動かし、解答から `private/` が見えないようにする
+### 隔離のしくみ
+
+隔離は2段構えです。
+
+1. **Claude Code の権限設定（`settings.json`）**
+   - `defaultMode: dontAsk`：許可リストに無いツールは、確認なしで自動的に拒否します。
+   - Bash は丸ごと禁止です。`cat` や `grep` などの読み取り専用コマンドは許可が無くても通ってしまうため、シェルそのものを使わせません。
+   - 許可するのは、作業ディレクトリ内の Read / Edit / Glob / Grep と、MCP の `judge` / `run_ruby` だけです。
+   - このリポジトリ（ジャッジ・非公開テスト・参考解）の読み書きは deny で明示的に禁止します。
+   - 問題文・競技条件・サンプル・起動設定の書き換えも禁止します。
+2. **解答の実行サンドボックス（`lib/golf_sandbox.rb`）**
+   - エージェントが書いた解答は、Linux では bubblewrap、macOS では sandbox-exec の中で実行します。
+   - リポジトリと非公開テストは見えず、ネットワークも使えません。
+   - どちらのサンドボックスも無い環境では、黙って素で動かさずにエラーにします。手元で人間が試すときは `GOLF_SANDBOX=off` で外せます。
+   - 非公開テストを読みに行く解答で確かめると、サンドボックスなしでは 4 ケース中 3 つが通りましたが、サンドボックスの中ではファイルが1つも見えませんでした。
+
+MCP サーバー（`tools/golf_mcp.rb`）は作業ディレクトリ内のファイルしか受け付けず、`../` や絶対パス、外を指すシンボリックリンクは拒否します。
+
+### 起動例（ステップ3のランナーで使う形）
+
+```sh
+cd /tmp/golf-ws-01
+CLAUDE_CONFIG_DIR=/tmp/golf-claude-config \
+claude -p "CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の解答を answer.rb に書いて" \
+  --settings /tmp/golf-ws-01-claude/settings.json \
+  --mcp-config /tmp/golf-ws-01-claude/golf-mcp.json --strict-mcp-config \
+  --permission-mode dontAsk
+```
+
+`CLAUDE_CONFIG_DIR` を空のディレクトリに向けると、ふだんの設定・MCP・ログインは読み込まれません。
+認証は `ANTHROPIC_API_KEY` か `CLAUDE_CODE_OAUTH_TOKEN`（`claude setup-token` で発行）で渡してください。
 
 ## 構成
 
@@ -84,6 +116,7 @@ ruby tools/export_workspace.rb 01 /tmp/golf-ws-01 [--show-target]
 .
 ├── CONDITIONS.md              # エージェント向けの競技条件
 ├── bin/judge                  # 採点スクリプト
+├── lib/golf_sandbox.rb        # 解答を隔離して実行する（bubblewrap / sandbox-exec）
 ├── problems/<問題>/           # 公開してよいもの
 │   ├── README.md              #   問題文
 │   ├── problem.yml            #   メタデータ（タイトル、難易度、目標バイト数）
@@ -95,7 +128,8 @@ ruby tools/export_workspace.rb 01 /tmp/golf-ws-01 [--show-target]
     ├── gen_tests.rb           # 非公開テストを生成（読みやすい参照実装つき）
     ├── extract_samples.rb     # README の入出力例から samples/ を生成
     ├── validate.rb            # 全テスト入力が問題文の制約を満たすか確認
-    └── export_workspace.rb    # エージェント用の作業ディレクトリを作る
+    ├── export_workspace.rb    # エージェント用の作業ディレクトリと権限設定を作る
+    └── golf_mcp.rb            # エージェントに渡す MCP サーバー（judge / run_ruby）
 ```
 
 ## テストの作り直し
