@@ -63,8 +63,8 @@ Ruby で解く、コードゴルフ（できるだけ短いコードで解く競
 ## 採点
 
 ```sh
-bin/judge 01 my_answer.rb            # 人間向けの表示
-bin/judge 01 my_answer.rb --json     # ランナー向けの JSON
+bin/judge 01 my_answer.rb            # 人間向けの表示（非公開もケースごと）
+bin/judge 01 my_answer.rb --json     # ランナー向けの JSON（ケースごと）
 bin/judge 01 my_answer.rb --verbose  # 非公開テストの失敗内容も表示（管理者用）
 ```
 
@@ -79,7 +79,8 @@ Score: 56 bytes
 ```
 
 - 公開サンプルが失敗したときは、期待出力と実際の出力を表示します。
-- 非公開テストは、合否と失敗の種類（`wrong_answer` / `runtime_error` / `timeout`）だけを表示します。
+- 既定の表示と `--json`、`--verbose` は、非公開テストもケースごとに出します。運営者・ランナーがケースごとの結果を見るときは `--json` か `--verbose` を使います。
+- エージェント向け（MCP の `judge` と作業ディレクトリの `./judge`。内部では `--agent`）は、公開サンプルの詳細と `hidden: n/m passed` だけです。非公開のケース名や失敗の種類（`wrong_answer` など）は出しません。通過数から入力を復元できないようにするためです。
 - 解答はサンドボックスの中で、標準入力だけを渡して実行します。制限時間を超えるとプロセスごと止めます。出力が 4MB を超えたときも止め、状態は `output_limit` です。
 - Linux は bubblewrap、macOS は sandbox-exec が必要です。無い場合は `GOLF_SANDBOX=off` で隔離なしで動かせます。
 

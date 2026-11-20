@@ -10,7 +10,7 @@ Encoding.default_external = Encoding::UTF_8
 #   <dest>/PROBLEM.md     問題文（--show-target を付けると目標バイト数を追記）
 #   <dest>/CONDITIONS.md  競技条件
 #   <dest>/samples/       公開サンプル
-#   <dest>/judge          採点用のラッパー（人間が ./judge answer.rb で使う。エージェントは MCP の judge を使う）
+#   <dest>/judge          採点用のラッパー（./judge answer.rb。非公開テストは通過数だけ）
 #
 # エージェントを起動するための設定は、作業ディレクトリの外（既定: <dest>-claude/）に書きます。
 #   <run-dir>/settings.json  権限設定（Bash 禁止、作業ディレクトリ外の読み書き禁止）。--settings で渡す
@@ -50,7 +50,8 @@ judge = File.join(dest, "judge")
 File.write(judge, <<~SH)
   #!/bin/sh
   # 採点: ./judge answer.rb
-  exec ruby #{File.join(ROOT, "bin", "judge").dump} #{meta["id"].dump} "$@"
+  # 非公開テストは通過数だけ返す。--agent は --json / --verbose より優先される。
+  exec ruby #{File.join(ROOT, "bin", "judge").dump} #{meta["id"].dump} --agent "$@"
 SH
 FileUtils.chmod(0o755, judge)
 
