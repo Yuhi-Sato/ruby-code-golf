@@ -27,7 +27,7 @@ MAX_OUTPUT = 4000
 TOOLS = [
   {
     name: "judge",
-    description: "解答ファイルを採点する。公開サンプルと非公開テストを実行し、全問正解ならバイト数をスコアとして返す。",
+    description: "解答ファイルを採点する。公開サンプルの詳細と、非公開テストの通過数（hidden: n/m passed）を返す。全問正解ならバイト数をスコアとして返す。",
     inputSchema: {
       type: "object",
       properties: { file: { type: "string", description: "作業ディレクトリからの相対パス（既定: answer.rb）" } },
@@ -89,7 +89,7 @@ end
 def call_tool(name, args)
   case name
   when "judge"
-    out, status = Open3.capture2e(RbConfig.ruby, JUDGE, PROBLEM, workspace_file(args["file"]))
+    out, status = Open3.capture2e(RbConfig.ruby, JUDGE, PROBLEM, workspace_file(args["file"]), "--agent")
     [utf8(out), !status.success?]
   when "run_ruby"
     input = args["stdin"].to_s

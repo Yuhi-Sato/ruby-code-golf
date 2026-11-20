@@ -3,12 +3,15 @@
 
 Encoding.default_external = Encoding::UTF_8
 
-# Usage: judge <problem> <solution.rb> [--json] [--verbose]
+# Usage: judge <problem> <solution.rb> [--json] [--verbose] [--agent]
 #   e.g. judge 01 answer.rb
 #
 # 公開サンプル (problems/<id>/samples) と非公開テスト (private/<id>/tests) で解答を採点します。
 # - サンプルが失敗したときは、期待出力と実際の出力を表示します。
-# - 非公開テストは合否と失敗の種類だけを表示し、入力や期待出力は表示しません（--verbose で表示）。
+# - 既定の表示は、非公開テストもケースごとの合否と失敗の種類を出します（入力は出さない）。
+# - --json と --verbose は運営者・ランナー向けで、非公開もケースごとに出します（--verbose は失敗の中身も）。
+# - --agent はエージェント向けです。公開サンプルの詳細と `hidden: n/m passed` だけを出します。
+#   非公開のケース名も失敗の種類も出しません。--json や --verbose より優先します。
 # - 全ケース正解のときだけバイト数を表示します。
 #
 # 非公開テストの場所は環境変数 GOLF_PRIVATE_DIR で変えられます（既定: <repo>/private）。
@@ -34,10 +37,12 @@ def score(path) = File.binread(path).delete_suffix("\n").bytesize
 def run(solution, input) = GolfSandbox.run_file(solution, input, time_limit: TIME_LIMIT)
 
 args = ARGV.reject { _1.start_with?("--") }
-json = ARGV.include?("--json")
-verbose = ARGV.include?("--verbose")
+# --agent は作業ディレクトリの ./judge と MCP から付く。後続の --json / --verbose では詳細を開けない。
+agent = ARGV.include?("--agent")
+json = ARGV.include?("--json") && !agent
+verbose = ARGV.include?("--verbose") && !agent
 problem, solution = args
-abort "Usage: judge <problem> <solution.rb> [--json] [--verbose]" unless problem && solution
+abort "Usage: judge <problem> <solution.rb> [--json] [--verbose] [--agent]" unless problem && solution
 abort "No such file: #{solution}" unless File.file?(solution)
 solution = File.expand_path(solution)
 
@@ -63,11 +68,41 @@ passed = results.count { _1[:status] == :accepted }
 accepted = passed == results.size
 bytes = score(solution)
 
+def show_failure_detail(result)
+  puts "    input:    #{result[:input].inspect[0, 300]}"
+  puts "    expected: #{normalize(result[:expected]).inspect[0, 300]}"
+  puts "    actual:   #{normalize(result[:actual]).inspect[0, 300]}"
+  err = utf8(result[:stderr])
+  puts "    stderr:   #{err.lines.first(3).join.strip}" unless err.empty?
+end
+
+def report_summary(slug, passed, total, accepted, bytes)
+  puts
+  puts "#{slug}: #{passed}/#{total} passed"
+  puts accepted ? "Score: #{bytes} bytes" : "Not accepted (#{bytes} bytes)"
+end
+
 if json
   puts JSON.generate(
     problem: slug, accepted:, passed:, total: results.size, bytes: accepted ? bytes : nil,
     cases: results.map { { name: _1[:name], kind: _1[:kind], status: _1[:status] } },
   )
+elsif agent
+  results.each do |r|
+    next unless r[:kind] == :sample
+
+    if r[:status] == :accepted
+      puts "  PASS #{r[:name]}"
+    else
+      puts "  FAIL #{r[:name]} (#{r[:status]})"
+      show_failure_detail(r)
+    end
+  end
+  hidden = results.select { _1[:kind] == :hidden }
+  hidden_passed = hidden.count { _1[:status] == :accepted }
+  puts
+  puts "hidden: #{hidden_passed}/#{hidden.size} passed"
+  report_summary(slug, passed, results.size, accepted, bytes)
 else
   results.each do |r|
     label = r[:kind] == :sample ? r[:name] : "hidden/#{r[:name]}"
@@ -78,14 +113,8 @@ else
     puts "  FAIL #{label} (#{r[:status]})"
     next unless r[:kind] == :sample || verbose
 
-    puts "    input:    #{r[:input].inspect[0, 300]}"
-    puts "    expected: #{normalize(r[:expected]).inspect[0, 300]}"
-    puts "    actual:   #{normalize(r[:actual]).inspect[0, 300]}"
-    err = utf8(r[:stderr])
-    puts "    stderr:   #{err.lines.first(3).join.strip}" unless err.empty?
+    show_failure_detail(r)
   end
-  puts
-  puts "#{slug}: #{passed}/#{results.size} passed"
-  puts accepted ? "Score: #{bytes} bytes" : "Not accepted (#{bytes} bytes)"
+  report_summary(slug, passed, results.size, accepted, bytes)
 end
 exit(accepted ? 0 : 1)
