@@ -67,11 +67,16 @@ settings = {
   "permissions" => {
     # allow に無いツールは確認なしで自動的に拒否する
     "defaultMode" => "dontAsk",
+    # パス無しの Glob / Grep は作業ディレクトリの外（他の /tmp や起動設定）も検索できる。
+    # `./**` に限定する。この環境には claude が無く、実行時の適用は未検証。
+    # 公式ドキュメント（2026-11 時点）では Glob(path) / Grep(path) はツール呼び出しに一致せず、
+    # 一致するのはツール名だけのルールで、Read の deny が Glob / Grep に best-effort で効く、とある。
+    # その記述どおりなら、ここでの allow は Glob / Grep を許可せず、dontAsk が拒否する。
     "allow" => [
       "Read(./**)",
       "Edit(./**)",
-      "Glob",
-      "Grep",
+      "Glob(./**)",
+      "Grep(./**)",
       "mcp__golf__judge",
       "mcp__golf__run_ruby",
     ],
@@ -83,7 +88,9 @@ settings = {
       "NotebookEdit",
       # リポジトリ（ジャッジ・非公開テスト・参考解）は読み書き禁止
       *hidden.flat_map { ["Read(#{abs.(_1)}/**)", "Edit(#{abs.(_1)}/**)"] },
-      # 起動設定は書き換え禁止
+      # 起動設定は読ませない（中にリポジトリの絶対パスがある）。書き換えも禁止。
+      # Read の deny は Glob / Grep にも best-effort でかかる、と公式ドキュメントにある。
+      "Read(#{abs.(run_dir)}/**)",
       "Edit(#{abs.(run_dir)}/**)",
       # 競技条件・問題文・サンプルは書き換え禁止
       "Edit(./.claude/**)",
