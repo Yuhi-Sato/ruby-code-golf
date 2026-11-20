@@ -62,13 +62,35 @@ def workspace_file(rel)
   real
 end
 
-def clip(s) = s.size > MAX_OUTPUT ? s[0, MAX_OUTPUT] + "\n...(省略)" : s
+# 解答の出力は UTF-8 とは限らない。不正なバイト列のまま JSON にするとサーバごと落ちる。
+def utf8(s)
+  str = s.to_s.dup.force_encoding(Encoding::UTF_8)
+  str.valid_encoding? ? str : str.scrub
+end
+
+def clip(s)
+  s = utf8(s)
+  s.size > MAX_OUTPUT ? s[0, MAX_OUTPUT] + "\n...(省略)" : s
+end
+
+def sanitize(obj)
+  case obj
+  when String
+    utf8(obj)
+  when Array
+    obj.map { sanitize(_1) }
+  when Hash
+    obj.each_with_object({}) { |(k, v), h| h[k.is_a?(String) ? utf8(k) : k] = sanitize(v) }
+  else
+    obj
+  end
+end
 
 def call_tool(name, args)
   case name
   when "judge"
     out, status = Open3.capture2e(RbConfig.ruby, JUDGE, PROBLEM, workspace_file(args["file"]))
-    [out, !status.success?]
+    [utf8(out), !status.success?]
   when "run_ruby"
     input = args["stdin"].to_s
     status, out, err =
@@ -87,35 +109,49 @@ end
 
 def reply(id, result: nil, error: nil)
   msg = { jsonrpc: "2.0", id: }
-  error ? msg[:error] = error : msg[:result] = result
+  error ? msg[:error] = sanitize(error) : msg[:result] = sanitize(result)
   $stdout.puts(JSON.generate(msg))
   $stdout.flush
 end
 
+# JSON 生成そのものが失敗したときでも、プロセスを落とさず JSON-RPC エラーを返す。
+def reply_error(id, code, message)
+  reply(id, error: { code:, message: utf8(message) })
+rescue StandardError
+  $stdout.puts(JSON.generate(jsonrpc: "2.0", id: nil, error: { code: -32603, message: "internal error" }))
+  $stdout.flush
+end
+
+# 1件のリクエストが失敗してもプロセスを終了しない。失敗は JSON-RPC エラーとして返す。
 $stdin.each_line do |line|
-  next if line.strip.empty?
+  id = nil
+  begin
+    next if line.strip.empty?
 
-  req = JSON.parse(line)
-  id = req["id"]
-  next if id.nil? # notification
+    req = JSON.parse(line)
+    id = req["id"]
+    next if id.nil? # notification
 
-  case req["method"]
-  when "initialize"
-    reply(id, result: {
-      protocolVersion: req.dig("params", "protocolVersion") || "2025-06-18",
-      capabilities: { tools: {} },
-      serverInfo: { name: "golf", version: "1.0.0" },
-    })
-  when "ping"
-    reply(id, result: {})
-  when "tools/list"
-    reply(id, result: { tools: TOOLS })
-  when "tools/call"
-    text, is_error = call_tool(req.dig("params", "name"), req.dig("params", "arguments") || {})
-    reply(id, result: { content: [{ type: "text", text: }], isError: is_error })
-  else
-    reply(id, error: { code: -32601, message: "Method not found: #{req["method"]}" })
+    case req["method"]
+    when "initialize"
+      reply(id, result: {
+        protocolVersion: req.dig("params", "protocolVersion") || "2025-06-18",
+        capabilities: { tools: {} },
+        serverInfo: { name: "golf", version: "1.0.0" },
+      })
+    when "ping"
+      reply(id, result: {})
+    when "tools/list"
+      reply(id, result: { tools: TOOLS })
+    when "tools/call"
+      text, is_error = call_tool(req.dig("params", "name"), req.dig("params", "arguments") || {})
+      reply(id, result: { content: [{ type: "text", text: }], isError: is_error })
+    else
+      reply(id, error: { code: -32601, message: "Method not found: #{req["method"]}" })
+    end
+  rescue JSON::ParserError => e
+    reply_error(nil, -32700, e.message)
+  rescue StandardError => e
+    reply_error(id, -32603, e.message)
   end
-rescue JSON::ParserError => e
-  reply(nil, error: { code: -32700, message: e.message })
 end
