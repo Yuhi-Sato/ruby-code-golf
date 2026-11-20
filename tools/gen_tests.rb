@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Encoding.default_external = Encoding::UTF_8
 # Readable reference implementations for the original problem set.
 require "date"
@@ -7,9 +9,16 @@ def lines(a) = a.join("\n") + "\n"
 def cases(dir, inputs)
   d = "#{ROOT}/private/#{dir}/tests"
   require "fileutils"; FileUtils.mkdir_p(d)
+  names = []
   inputs.each_with_index do |inp, i|
-    File.write("#{d}/#{format("%02d", i + 1)}.in", inp)
-    File.write("#{d}/#{format("%02d", i + 1)}.out", yield(inp))
+    name = format("%02d", i + 1)
+    names << name
+    File.write("#{d}/#{name}.in", inp)
+    File.write("#{d}/#{name}.out", yield(inp))
+  end
+  Dir.glob("#{d}/*.{in,out}").each do |path|
+    base = File.basename(path).sub(/\.(in|out)\z/, "")
+    File.delete(path) unless names.include?(base)
   end
 end
 

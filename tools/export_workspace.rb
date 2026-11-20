@@ -18,6 +18,8 @@ Encoding.default_external = Encoding::UTF_8
 # 作業ディレクトリ内の .claude/settings.json は、信頼していないディレクトリでは allow が無視されるため使いません。
 #
 # 非公開テストと参考解はコピーしません。ラッパーと MCP サーバーはこのリポジトリのものを呼ぶだけです。
+# 出力先（作業ディレクトリと起動設定）がリポジトリの中だと、エージェントに渡すファイルが
+# リポジトリへ混ざるので拒否します。
 
 require "fileutils"
 require "rbconfig"
@@ -25,6 +27,19 @@ require "json"
 require "yaml"
 
 ROOT = File.expand_path("..", __dir__)
+
+def inside_repo?(path)
+  root = File.realpath(ROOT)
+  current = File.expand_path(path)
+  until File.exist?(current)
+    parent = File.dirname(current)
+    break if parent == current
+
+    current = parent
+  end
+  real = File.realpath(current)
+  real == root || real.start_with?(root + "/")
+end
 
 args = ARGV.reject { _1.start_with?("--") }
 show_target = ARGV.include?("--show-target")
@@ -35,6 +50,8 @@ run_dir = File.expand_path(ARGV.find { _1.start_with?("--run-dir=") }&.split("="
 
 src = Dir[File.join(ROOT, "problems", "#{problem}*")].first
 abort "No such problem: #{problem}" unless src
+abort "出力先がリポジトリの中です: #{dest}" if inside_repo?(dest)
+abort "起動設定の出力先がリポジトリの中です: #{run_dir}" if inside_repo?(run_dir)
 abort "#{dest} already exists and is not empty" if File.exist?(dest) && !Dir.empty?(dest)
 
 meta = YAML.safe_load_file(File.join(src, "problem.yml"))
@@ -51,7 +68,7 @@ File.write(judge, <<~SH)
   #!/bin/sh
   # 採点: ./judge answer.rb
   # 非公開テストは通過数だけ返す。--agent は --json / --verbose より優先される。
-  exec ruby #{File.join(ROOT, "bin", "judge").dump} #{meta["id"].dump} --agent "$@"
+  exec #{RbConfig.ruby.dump} #{File.join(ROOT, "bin", "judge").dump} #{meta["id"].dump} --agent "$@"
 SH
 FileUtils.chmod(0o755, judge)
 
