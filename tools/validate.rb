@@ -64,11 +64,45 @@ VALIDATORS = {
     check(ls.map(&:size).uniq.size == 1 && (1..20).cover?(ls[0].size), "w")
     ls.each { check(_1.match?(/\A[#.]+\z/), "文字") }
   },
+  # ---- Anybatross ----
+  "ab01" => ->(s) {
+    lines_of(s).each { n = _1.scan(/\X/).size; check(n >= 2 && n.even?, "書記素数 #{n}: #{_1}") }
+  },
+  "ab02" => ->(s) {
+    lines_of(s).each do |l|
+      check(l.match?(/\A[a-z]+( [a-z]+)*\z/), "形式 #{l}")
+      k = (l.ord - "y".ord) % 26
+      check(l.split[0].each_char.map { ((_1.ord - 97 - k) % 26 + 97).chr }.join == "yapc", "先頭が yapc でない: #{l}")
+    end
+  },
+  "ab03" => ->(s) {
+    ls = lines_of(s)
+    re = %r{\A\S+ - - \[\d\d/\w{3}/\d{4}:(\d\d):(\d\d):\d\d \+0900\] "[^"]*" ([2-5]\d\d) \d+ "[^"]*" "[^"]*" \d+\z}
+    ms = ls.map { |l| m = l.match(re); check(m, "形式 #{l}"); [m[1], m[2]] }
+    check(ms.map(&:first).uniq.size == 1, "時が複数")
+    check(ms.map(&:last) == ms.map(&:last).sort, "時刻順でない")
+  },
+  "ab04" => ->(s) {
+    ops = %w[+ - * / % = != < > <= >= dup drop swap . cr if else then begin until]
+    lines_of(s).each { check(ops.include?(_1) || _1.match?(/\A\d+\z/), "トークン #{_1}") }
+  },
+  "ab05" => ->(s) {
+    lines_of(s).each { check(_1.match?(/\A[0-9A-Za-zぁ-んァ-ンー]+( [0-9A-Za-zぁ-んァ-ンー]+)+\z/), "行 #{_1}") }
+  },
+  "ab06" => ->(s) {
+    ls = lines_of(s); check(ls.size.even? && (2..40).cover?(ls.size), "高さ")
+    check(ls.map(&:size).uniq.size == 1 && ls[0].size.even? && (2..40).cover?(ls[0].size), "幅")
+    ls.each { check(_1.match?(/\A[`#]+\z/), "文字") }
+  },
+  "ab07" => ->(s) { lines_of(s).each { check(_1.match?(/\A[^a-z\n]+\z/) && _1.ascii_only?, "行 #{_1.inspect}") } },
+  "ab08" => ->(s) {
+    ls = lines_of(s); check(ls.size == 1 && ls[0].match?(/\A[a-z]+( [a-z]+)*\z/), "形式")
+  },
 }
 
 ok = true
 Dir[File.join(ROOT, "private", "*", "tests", "*.in"), File.join(ROOT, "problems", "*", "samples", "*.in")].sort.each do |path|
-  id = path[%r{/(\d\d)[^/]*/(tests|samples)/}, 1]
+  id = path[%r{/([^/-]+)-[^/]*/(tests|samples)/}, 1]
   VALIDATORS.fetch(id).(File.read(path))
 rescue => e
   ok = false

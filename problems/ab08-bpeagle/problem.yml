@@ -1,0 +1,24 @@
+id: ab08
+slug: ab08-bpeagle
+title: BPEagle
+difficulty: 3
+target_bytes: 102
+target_source: Ruby での全言語最短記録
+time_limit_per_case_sec: 5
+source:
+  contest: Anybatross YAPC::Fukuoka 2025
+  hole: 2
+  url: https://perlbatross.kayac.com/contest/2025fukuoka/challenge/2
+par: 250
+records:
+  overall:
+    bytes: 102
+    score: -148
+    language: Ruby
+    author: nsfisis
+  ruby:
+    bytes: 102
+    score: -148
+    author: nsfisis
+reference_bytes: 176
+tests: 自作（公式の入出力例を含む）。公式の非公開テストとは異なる

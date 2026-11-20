@@ -1,0 +1,24 @@
+id: ab07
+slug: ab07-counter-counter
+title: Counter Counter
+difficulty: 1
+target_bytes: 45
+target_source: Perl での全言語最短記録
+time_limit_per_case_sec: 5
+source:
+  contest: Anybatross YAPC::Fukuoka 2025
+  hole: 1
+  url: https://perlbatross.kayac.com/contest/2025fukuoka/challenge/1
+par: 100
+records:
+  overall:
+    bytes: 45
+    score: -55
+    language: Perl
+    author: moznion
+  ruby:
+    bytes: 64
+    score: -36
+    author: mame
+reference_bytes: 73
+tests: 自作（公式の入出力例を含む）。公式の非公開テストとは異なる

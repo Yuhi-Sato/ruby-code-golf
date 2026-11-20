@@ -1,9 +1,11 @@
 # Ruby Code Golf
 
-Ruby で解く、コードゴルフ（できるだけ短いコードで解く競技）のオリジナル問題集です。
-YAPC のコードゴルフ企画 Perlbatross（YAPC::Fukuoka 2025 は2問）の5回分、10問を収録しています。
+Ruby で解く、コードゴルフ（できるだけ短いコードで解く競技）の問題集です。次の2つのセットを収録しています。
 
-## 問題
+- オリジナル問題 10問（YAPC のコードゴルフ企画の5回分を想定）
+- 過去の Anybatross の問題 8問（問題文は書き直し、テストは自作、最短記録つき）
+
+## オリジナル問題（10問）
 
 | # | 問題 | 難易度 | パー |
 | --- | --- | --- | --- |
@@ -19,6 +21,32 @@ YAPC のコードゴルフ企画 Perlbatross（YAPC::Fukuoka 2025 は2問）の5
 | 10 | [罫線化](problems/10-box-drawing/README.md) | ★★★ | 168 bytes |
 
 「パー」は参考解（`private/<問題>/solution.rb`）のバイト数で、各問題の `problem.yml` の `target_bytes` と同じです。
+
+## 過去の Anybatross の問題（8問）
+
+カヤック主催のコードゴルフ大会 Anybatross（旧 Perlbatross。YAPC に合わせて開催）の過去問 8 問です。
+問題文は元の問題をもとに書き直したもので、元の問題へのリンクを各問題に載せています。
+
+| # | 問題 | 出典 | Par | 全言語最短 | Ruby 最短 | 参考解 (Ruby) |
+| --- | --- | --- | --- | --- | --- | --- |
+| ab01 | [Split of Grapheme](problems/ab01-split-of-grapheme/README.md) | Hiroshima 2024 Hole 1 | 105 | 51 (Perl, KarakasaDcFd) | なし | 64 |
+| ab02 | [The bombe](problems/ab02-the-bombe/README.md) | Hiroshima 2024 Hole 2 | 105 | 38 (Perl, KarakasaDcFd) | なし | 63 |
+| ab03 | [Apache's Call](problems/ab03-apaches-call/README.md) | Hiroshima 2024 Hole 3 | 190 | 101 (Perl, sugyan) | なし | 115 |
+| ab04 | [Pytecode](problems/ab04-pytecode/README.md) | Hiroshima 2024 Hole 4 | 450 | 256 (Perl, KarakasaDcFd) | なし | 327 |
+| ab05 | [Portalbress Gramana](problems/ab05-portalbress/README.md) | Hakodate 2024 Hole 1 | 100 | 64 (Perl, こーのいけ) | なし | 55 |
+| ab06 | [QuAArterPix](problems/ab06-quaarterpix/README.md) | Hakodate 2024 Hole 2 | 105 | 70 (Perl, sugyan / こーのいけ) | なし | 135 |
+| ab07 | [Counter Counter](problems/ab07-counter-counter/README.md) | Fukuoka 2025 Hole 1 | 100 | 45 (Perl, moznion) | 64 (mame) | 73 |
+| ab08 | [BPEagle](problems/ab08-bpeagle/README.md) | Fukuoka 2025 Hole 2 | 250 | 102 (Ruby, nsfisis) | 102 (nsfisis) | 176 |
+
+記録は大会サイトのランキングと[カヤックの講評記事](https://techblog.kayac.com/anybatross2025-editorial)によります（2026年11月時点）。
+2024年の2大会は Perl のみの提出で、Ruby の記録はありません。各問題の `problem.yml` の `records` に同じ内容を入れています。
+
+**注意:**
+
+- **テストは自作です。** 公式の非公開テストは公開されていないため、問題文と公式の入出力例をもとに参照実装を書いてテストを作りました。公式の入出力例はすべてテストに入れてあり、参照実装はそれを再現します。テスト生成器（`tools/gen_anybatross_tests.rb`）とは別に書いた Ruby の参考解も、全テストに通ります。
+- **記録とスコアはそのまま比べられません。** 記録は公式テストに対するものです。テストが違うので、ここで記録より短い解答が通っても、公式で通るとは限りません。
+- **仕様をはっきりさせた問題があります。** 元の問題文で解釈が分かれる箇所は、実際に正解した参加者の記録に合わせたうえで、どの解釈でも答えが変わらない入力だけをテストに使っています。特に ab03（1分の区切り方と打ち切り）と ab04（演算の順や `if` の扱い）は、問題文に「元の問題との違い」を書いています。
+- 参考解が記録より短いもの（ab05）は、テストが公式より甘い可能性があります。
 
 ## ルール
 
@@ -125,7 +153,8 @@ claude -p "CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の�
 │   ├── tests/                 #   非公開テスト (*.in / *.out)
 │   └── solution.rb            #   参考解（ネタバレ）
 └── tools/
-    ├── gen_tests.rb           # 非公開テストを生成（読みやすい参照実装つき）
+    ├── gen_tests.rb           # オリジナル10問の非公開テストを生成（読みやすい参照実装つき）
+    ├── gen_anybatross_tests.rb # Anybatross 8問の非公開テストを生成
     ├── extract_samples.rb     # README の入出力例から samples/ を生成
     ├── validate.rb            # 全テスト入力が問題文の制約を満たすか確認
     ├── export_workspace.rb    # エージェント用の作業ディレクトリと権限設定を作る
@@ -136,6 +165,7 @@ claude -p "CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の�
 
 ```sh
 ruby tools/gen_tests.rb .
+ruby tools/gen_anybatross_tests.rb .
 ruby tools/extract_samples.rb
 ruby tools/validate.rb
 ```

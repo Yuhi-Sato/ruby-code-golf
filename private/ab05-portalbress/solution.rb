@@ -1,0 +1,1 @@
+$<.map{p _1.split.map{|w|w.chars.sort}.uniq.size<2?1:0}

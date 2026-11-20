@@ -1,0 +1,12 @@
+10
+begin
+dup
+.
+cr
+1
+-
+dup
+0
+=
+until
+drop

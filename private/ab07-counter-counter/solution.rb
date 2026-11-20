@@ -1,0 +1,1 @@
+t=0;$<.map{|l|n=l.count("0469ADOPQR8B")+l.count("8B");puts"#{t+=n},#{n}"}

@@ -1,0 +1,1 @@
+g=$<.map &:chomp;g.each_slice(2){|a,b|puts (0...a.size).step(2).map{|x|q=[a[x],a[x+1],b[x],b[x+1]];h=q.count ?#;h>2??#:h<2??`:q[0]}*""}

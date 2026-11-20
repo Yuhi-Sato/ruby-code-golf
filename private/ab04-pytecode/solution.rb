@@ -1,0 +1,1 @@
+s=[];eval$<.map{|t|t=t.chomp;{"dup"=>"s<<s[-1]","drop"=>"s.pop","swap"=>"s[-2,2]=s[-2,2].reverse","."=>"$><<s.pop","cr"=>"puts","if"=>"if s.pop>0","else"=>"else","then"=>"end","begin"=>"begin","until"=>"end until s.pop>0"}[t]||(t=~/\d/?"s<<#{t}":"b,a=s.pop,s.pop;s<<(a#{t=="="?"==":t}b).then{_1==true ?1:_1==false ?0:_1}")}*";"

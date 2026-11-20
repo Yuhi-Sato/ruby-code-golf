@@ -1,0 +1,21 @@
+id: ab03
+slug: ab03-apaches-call
+title: Apache's Call
+difficulty: 2
+target_bytes: 101
+target_source: Perl での全言語最短記録
+time_limit_per_case_sec: 5
+source:
+  contest: Anybatross YAPC::Hiroshima 2024
+  hole: 3
+  url: https://perlbatross.kayac.com/contest/2024hiroshima/challenge/3
+par: 190
+records:
+  overall:
+    bytes: 101
+    score: -89
+    language: Perl
+    author: sugyan
+  ruby:
+reference_bytes: 115
+tests: 自作（公式の入出力例を含む）。公式の非公開テストとは異なる

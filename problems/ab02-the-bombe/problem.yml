@@ -1,0 +1,21 @@
+id: ab02
+slug: ab02-the-bombe
+title: The bombe
+difficulty: 1
+target_bytes: 38
+target_source: Perl での全言語最短記録
+time_limit_per_case_sec: 5
+source:
+  contest: Anybatross YAPC::Hiroshima 2024
+  hole: 2
+  url: https://perlbatross.kayac.com/contest/2024hiroshima/challenge/2
+par: 105
+records:
+  overall:
+    bytes: 38
+    score: -67
+    language: Perl
+    author: KarakasaDcFd
+  ruby:
+reference_bytes: 63
+tests: 自作（公式の入出力例を含む）。公式の非公開テストとは異なる

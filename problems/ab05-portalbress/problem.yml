@@ -1,0 +1,21 @@
+id: ab05
+slug: ab05-portalbress
+title: Portalbress Gramana
+difficulty: 1
+target_bytes: 64
+target_source: Perl での全言語最短記録
+time_limit_per_case_sec: 5
+source:
+  contest: Anybatross YAPC::Hakodate 2024
+  hole: 1
+  url: https://perlbatross.kayac.com/contest/2024hakodate/challenge/1
+par: 100
+records:
+  overall:
+    bytes: 64
+    score: -36
+    language: Perl
+    author: こーのいけ
+  ruby:
+reference_bytes: 55
+tests: 自作（公式の入出力例を含む）。公式の非公開テストとは異なる

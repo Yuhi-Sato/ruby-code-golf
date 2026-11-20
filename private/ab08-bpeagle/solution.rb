@@ -1,0 +1,1 @@
+w=gets.split;d=[];k=?A;loop{c=Hash.new 0;w.map{|x|x.chars.each_cons(2){c[_1*""]+=1}};b,n=c.max_by{_2};break if !n||n<2;d<<k+":"+b;w.map!{_1.gsub b,k};k=k.succ};puts d*",",w*" "

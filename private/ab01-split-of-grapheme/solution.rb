@@ -1,0 +1,1 @@
+$<.map{puts _1.chomp.scan(/(\X)(\X)/).transpose.map(&:join)*" "}
