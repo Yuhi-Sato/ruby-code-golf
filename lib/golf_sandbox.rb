@@ -17,6 +17,8 @@ require "fileutils"
 module GolfSandbox
   ROOT = File.expand_path("..", __dir__)
   CHILD_ENV = { "LANG" => "C.UTF-8", "LC_ALL" => "C.UTF-8" }.freeze
+  # 標準出力・標準エラーそれぞれ。超えたらプロセスを止めて :output_limit を返す。
+  OUTPUT_LIMIT = 4 * 1024 * 1024
 
   module_function
 
@@ -39,7 +41,7 @@ module GolfSandbox
   def which(cmd) = ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { File.join(_1, cmd) }.find { File.executable?(_1) }
 
   # ruby_args を隔離して実行し、[status, stdout, stderr] を返す。
-  # status は :ok / :runtime_error / :timeout
+  # status は :ok / :runtime_error / :timeout / :output_limit
   # 制限時間は起動から標準入力の書き込み、プロセスの終了までを覆う。
   # 大きな標準入力を子が読まないまま眠ると、書き込みがパイプでブロックするため、
   # 書き込みが終わってから計時すると制限が効かない。
@@ -49,8 +51,15 @@ module GolfSandbox
       cmd = wrap([RbConfig.ruby, *ruby_args], tmp)
       deadline = monotonic + time_limit
       Open3.popen3(*cmd, chdir: tmp, pgroup: true, unsetenv_others: true) do |stdin, stdout, stderr, th|
-        out = Thread.new { stdout.read }
-        err = Thread.new { stderr.read }
+        limited = false
+        limit_lock = Mutex.new
+        on_limit = lambda do
+          first = false
+          limit_lock.synchronize { first = !limited; limited = true }
+          kill_group(th.pid) if first
+        end
+        out = Thread.new { read_capped(stdout, on_limit) }
+        err = Thread.new { read_capped(stderr, on_limit) }
         writer = Thread.new { write_stdin(stdin, input) }
         remaining = deadline - monotonic
         timed_out = !th.join(remaining.positive? ? remaining : 0)
@@ -59,13 +68,37 @@ module GolfSandbox
           th.join
         end
         writer.join
-        status = timed_out ? :timeout : (th.value.success? ? :ok : :runtime_error)
+        hit_limit = limit_lock.synchronize { limited }
+        status = if hit_limit
+          :output_limit
+        elsif timed_out
+          :timeout
+        else
+          th.value.success? ? :ok : :runtime_error
+        end
         [status, out.value, err.value]
       end
     end
   end
 
   def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+  # 上限を超えた分は捨て、on_limit を一度呼ぶ。呼び出し側がプロセスを止める。
+  def read_capped(io, on_limit)
+    buf = +"".b
+    io.binmode
+    while (chunk = io.read(65_536))
+      buf << chunk
+      next if buf.bytesize <= OUTPUT_LIMIT
+
+      buf = buf.byteslice(0, OUTPUT_LIMIT)
+      on_limit.call
+      break
+    end
+    buf
+  rescue IOError
+    buf
+  end
 
   def write_stdin(stdin, input)
     stdin.write(input.to_s)
