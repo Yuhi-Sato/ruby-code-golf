@@ -115,7 +115,7 @@ ruby tools/export_workspace.rb 01 /tmp/golf-ws-01 [--show-target]
 1. **Claude Code の権限設定（`settings.json`）**
    - `defaultMode: dontAsk`：許可リストに無いツールは、確認なしで自動的に拒否します。
    - Bash は丸ごと禁止です。`cat` や `grep` などの読み取り専用コマンドは許可が無くても通ってしまうため、シェルそのものを使わせません。
-   - 許可するのは、作業ディレクトリ内の Read / Edit / Glob / Grep と、MCP の `judge` / `run_ruby` だけです。
+   - 許可するのは、作業ディレクトリ内の Read / Edit と、`Glob(./**)` / `Grep(./**)`、MCP の `judge` / `run_ruby` だけです。パスの付いていない Glob / Grep は作業ディレクトリの外も検索できます。Claude Code がこのパス指定を実際に適用するかは、この環境に `claude` が無く未検証です。
    - このリポジトリ（ジャッジ・非公開テスト・参考解）の読み書きは deny で明示的に禁止します。
    - 問題文・競技条件・サンプル・起動設定の書き換えも禁止します。
 2. **解答の実行サンドボックス（`lib/golf_sandbox.rb`）**
