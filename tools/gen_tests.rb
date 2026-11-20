@@ -214,6 +214,18 @@ cases("09-ruby-indent", [
       puts "ok"
     end
   R
+  # rand は呼ばない（このあとの問題の乱数がずれないように）。
+  # 行末の undo / todo は単語の do ではない。do$ では誤って段を増やす。
+  lines([
+    "  def run(items)",
+    "x = undo",
+    "    todo",
+    " items.each do |x|",
+    "p x",
+    "   end",
+    "  y = 1",
+    " end",
+  ]),
 ]) { |inp| indent.(inp) }
 
 # 10 罫線

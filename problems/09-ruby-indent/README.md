@@ -11,9 +11,9 @@
 1. `s` が空なら空行を出力する
 2. `s` が `end` `else` `elsif` `when` `rescue` `ensure` のいずれかの単語で始まるなら `L - 1` 段、そうでなければ `L` 段で `s` を出力する
 3. `s` が `end` で始まるなら `L` を1減らす
-4. `s` が `def` `class` `module` `if` `unless` `while` `until` `case` `begin` のいずれかの単語で始まる、または `do` か `do |...|` で終わるなら `L` を1増やす
+4. `s` が `def` `class` `module` `if` `unless` `while` `until` `case` `begin` のいずれかの単語で始まる、または単語としての `do` か `do |...|` で終わるなら `L` を1増やす
 
-「単語で始まる」とは、その語の直後が英数字やアンダースコアでないことです（`endpoint` は `end` で始まる語ではありません）。
+「単語」とは、その語の前後が英数字やアンダースコアでないことです（`endpoint` は `end` で始まる語ではなく、`undo` や `todo` は `do` で終わる語ではありません）。
 
 ## 入力
 
