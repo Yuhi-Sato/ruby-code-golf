@@ -15,14 +15,15 @@ Encoding.default_external = Encoding::UTF_8
 # - 全ケース正解のときだけバイト数を表示します。
 #
 # 非公開テストの場所は環境変数 GOLF_PRIVATE_DIR で変えられます（既定: <repo>/private）。
+# 1ケースの制限時間は problem.yml の time_limit_per_case_sec。GOLF_TIME_LIMIT があればそちらを使う。
 # 解答はサンドボックスの中で実行し、リポジトリと非公開テストは見えません（GOLF_SANDBOX、lib/golf_sandbox.rb 参照）。
 
 require "json"
+require "yaml"
 require_relative "../lib/golf_sandbox"
 
 ROOT = File.expand_path("..", __dir__)
 PRIVATE_DIR = GolfSandbox.private_dir
-TIME_LIMIT = Float(ENV.fetch("GOLF_TIME_LIMIT", "5"))
 
 def utf8(s)
   str = s.to_s.dup.force_encoding(Encoding::UTF_8)
@@ -49,6 +50,10 @@ solution = File.expand_path(solution)
 public_dir = Dir[File.join(ROOT, "problems", "#{problem}*")].first
 abort "No such problem: #{problem}" unless public_dir
 slug = File.basename(public_dir)
+meta = YAML.safe_load_file(File.join(public_dir, "problem.yml"))
+raw_limit = ENV["GOLF_TIME_LIMIT"]
+raw_limit = meta["time_limit_per_case_sec"] if raw_limit.nil? || raw_limit.empty?
+TIME_LIMIT = Float(raw_limit || 5)
 
 cases = Dir[File.join(public_dir, "samples", "*.in")].sort.map { [:sample, _1] } +
         Dir[File.join(PRIVATE_DIR, slug, "tests", "*.in")].sort.map { [:hidden, _1] }
