@@ -40,31 +40,51 @@ module GolfSandbox
 
   # ruby_args を隔離して実行し、[status, stdout, stderr] を返す。
   # status は :ok / :runtime_error / :timeout
+  # 制限時間は起動から標準入力の書き込み、プロセスの終了までを覆う。
+  # 大きな標準入力を子が読まないまま眠ると、書き込みがパイプでブロックするため、
+  # 書き込みが終わってから計時すると制限が効かない。
   def run(ruby_args, input, time_limit:)
     Dir.mktmpdir("golf-run") do |tmp|
       tmp = File.realpath(tmp)
       cmd = wrap([RbConfig.ruby, *ruby_args], tmp)
+      deadline = monotonic + time_limit
       Open3.popen3(*cmd, chdir: tmp, pgroup: true, unsetenv_others: true) do |stdin, stdout, stderr, th|
         out = Thread.new { stdout.read }
         err = Thread.new { stderr.read }
-        begin
-          stdin.write(input)
-        rescue Errno::EPIPE
-          nil
-        end
-        stdin.close
-        unless th.join(time_limit)
-          begin
-            Process.kill("KILL", -th.pid)
-          rescue Errno::ESRCH
-            nil
-          end
+        writer = Thread.new { write_stdin(stdin, input) }
+        remaining = deadline - monotonic
+        timed_out = !th.join(remaining.positive? ? remaining : 0)
+        if timed_out
+          kill_group(th.pid)
           th.join
-          return [:timeout, out.value, err.value]
         end
-        [th.value.success? ? :ok : :runtime_error, out.value, err.value]
+        writer.join
+        status = timed_out ? :timeout : (th.value.success? ? :ok : :runtime_error)
+        [status, out.value, err.value]
       end
     end
+  end
+
+  def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+  def write_stdin(stdin, input)
+    stdin.write(input.to_s)
+  rescue Errno::EPIPE, Errno::ECONNRESET, IOError
+    nil
+  ensure
+    begin
+      stdin.close
+    rescue IOError
+      nil
+    end
+  end
+
+  def kill_group(pid)
+    Process.kill("KILL", -pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    Process.kill("KILL", pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    nil
   end
 
   # 解答ファイルを一時ディレクトリにコピーしてから実行する（元の場所がリポジトリ内でも動くように）
