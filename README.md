@@ -127,19 +127,84 @@ ruby tools/export_workspace.rb 01 /tmp/golf-ws-01 [--show-target]
 
 MCP サーバー（`tools/golf_mcp.rb`）は作業ディレクトリ内のファイルしか受け付けず、`../` や絶対パス、外を指すシンボリックリンクは拒否します。
 
-### 起動例（ステップ3のランナーで使う形）
+### 評価ランナー
+
+1問（または全部）を、隔離した Claude Code に解かせてから、運営者向けの `bin/judge --json` で回収します。作業ディレクトリとログは残します。
 
 ```sh
-cd /tmp/golf-ws-01
-CLAUDE_CONFIG_DIR=/tmp/golf-claude-config \
-claude -p "CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の解答を answer.rb に書いて" \
-  --settings /tmp/golf-ws-01-claude/settings.json \
-  --mcp-config /tmp/golf-ws-01-claude/golf-mcp.json --strict-mcp-config \
-  --permission-mode dontAsk
+bin/evaluate runs/specs/01.yml
+bin/evaluate --problem 01 --time-limit 30m --show-target
+bin/evaluate --all
+bin/evaluate --all --jobs 2
 ```
 
-`CLAUDE_CONFIG_DIR` を空のディレクトリに向けると、ふだんの設定・MCP・ログインは読み込まれません。
-認証は `ANTHROPIC_API_KEY` か `CLAUDE_CODE_OAUTH_TOKEN`（`claude setup-token` で発行）で渡してください。
+仕様 YAML（`runs/specs/*.yml`）か、同じ内容のコマンド引数です。
+
+| 項目 | 意味 | 既定 |
+| --- | --- | --- |
+| `problem` | 問題 id（`01` や `ab01`） | 必須（`--all` のときは全問） |
+| `model` | `claude --model` に渡す名前 | 指定しない |
+| `time_limit` | この時間でプロセスグループを止める | `30m` |
+| `silence_limit` | 標準出力・標準エラーが止まったら止める | `5m` |
+| `show_target` | 問題文に目標バイト数を足す | `false` |
+| `prompt` | `claude -p` に渡す文 | CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の `answer.rb` を書く |
+
+時間は `30m`、`90s`、`1h`、秒の数、のどれでも書けます。
+
+出力先はリポジトリの外です。権限の deny とサンドボックスがリポジトリ自体を隠すので、リポジトリの中（gitignore した場所も含む）には置けません。
+
+```
+~/golf-runs/runs/<時刻>-<問題>/     # GOLF_RUNS_DIR で親を変えられる
+├── workspace/                      # エージェントの作業ディレクトリ（answer.rb はここ）
+├── settings/                       # settings.json と golf-mcp.json
+├── claude-config/                  # この実行だけの CLAUDE_CONFIG_DIR
+├── stream.jsonl                    # claude --output-format stream-json
+├── claude.stderr.log
+└── result.json
+```
+
+`result.json` には、合否、バイト数、目標との差（`delta`）、壁時計時間、stream-json のトークン使用量、`judge` / `run_ruby` の呼び出し回数、終了理由（`finished` / `timeout` / `silence` / `error`）が入っています。`judge` フィールドは `bin/judge --json` のケースごとの結果です。
+
+終了理由が `timeout` か `silence` のときは、そのプロセスグループを kill します。ディレクトリは消しません。
+
+#### 認証
+
+このランナーは、API キーではなく Claude のサブスクリプションアカウントを使います。ログインは Google です。各実行は空の `CLAUDE_CONFIG_DIR` で始まるので、ふだんの `~/.claude` のログインは読めません。トークンを環境変数で渡します。
+
+```sh
+claude setup-token
+```
+
+ブラウザが開いたら **Google ログイン** を選びます。表示されたトークンを、シェルの環境変数にだけ入れます。ファイルや git には書きません。
+
+```sh
+export CLAUDE_CODE_OAUTH_TOKEN='ここにトークン'
+bin/evaluate runs/specs/01.yml
+```
+
+トークンが無く、資格情報のコピーも無いときは、作業ディレクトリを作る前にエラーで止まります。
+
+Linux で、すでに `claude` にログインしている設定ディレクトリがある場合は、その中の `.credentials.json` だけを実行ごとの設定ディレクトリへコピーできます。`settings.json` や MCP や `CLAUDE.md` はコピーしません。
+
+```sh
+bin/evaluate --credentials-from ~/.claude runs/specs/01.yml
+```
+
+macOS では資格情報が Keychain に入るため、このコピーではログインできません。`claude setup-token` で作った `CLAUDE_CODE_OAUTH_TOKEN` を使ってください。
+
+ここでの動作確認は、本物の `claude` ではなく `test/support/fake_claude.rb` を PATH の `claude` として置いた自動テストです。実際の Claude Code へのログインや、モデルが解答を書くところは、この環境では確認していません。
+
+ランナーが内部で実行するコマンドは次の形です。
+
+```sh
+cd <workspace>
+CLAUDE_CONFIG_DIR=<claude-config> \
+claude -p "..." \
+  --settings <settings>/settings.json \
+  --mcp-config <settings>/golf-mcp.json --strict-mcp-config \
+  --permission-mode dontAsk \
+  --output-format stream-json --verbose
+```
 
 ## 構成
 
@@ -147,7 +212,10 @@ claude -p "CONDITIONS.md と PROBLEM.md を読んで、judge に通る最短の�
 .
 ├── CONDITIONS.md              # エージェント向けの競技条件
 ├── bin/judge                  # 採点スクリプト
+├── bin/evaluate               # 評価ランナー（準備、Claude Code、回収）
+├── lib/golf_runner.rb         # 評価ランナーの本体
 ├── lib/golf_sandbox.rb        # 解答を隔離して実行する（bubblewrap / sandbox-exec）
+├── runs/specs/                # 評価ランナーの仕様 YAML（結果の出力先ではない）
 ├── problems/<問題>/           # 公開してよいもの
 │   ├── README.md              #   問題文
 │   ├── problem.yml            #   メタデータ（タイトル、難易度、目標バイト数）
