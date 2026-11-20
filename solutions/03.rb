@@ -1,0 +1,1 @@
+$<.map{|l|s=?I*l.to_i;%w[IIIII V VV X XXXXX L LL C CCCCC D DD M IIII IV VIV IX XXXX XL LXL XC CCCC CD DCD CM].each_slice(2){s.gsub!(*_1)};puts s}

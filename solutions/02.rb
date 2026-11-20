@@ -1,0 +1,1 @@
+n=gets.to_i;(1-n...n).map{|i|puts" "*i.abs+"#{(10**(n-i.abs)/9)**2}"}

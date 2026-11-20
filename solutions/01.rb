@@ -1,0 +1,1 @@
+s=?1;gets.to_i.times{puts s;s=s.gsub(/(.)\1*/){"#{$&.size}"+$1}}
