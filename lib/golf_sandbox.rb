@@ -4,7 +4,9 @@
 #
 # - Linux: bubblewrap (bwrap)。Ruby の実行に必要な場所だけを読み取り専用で見せ、
 #   /tmp とホームは空の tmpfs にする。リポジトリはマウントしない。ネットワークは切る。
-# - macOS: sandbox-exec。リポジトリと非公開テストの読み書きを禁止し、ネットワークを切ります。
+# - macOS: sandbox-exec。リポジトリの読み取りを禁止し、書き込みは実行ディレクトリだけ、
+#   プロセスの実行は ruby だけにする。ネットワークも切る。
+#   このプロファイルは macOS 上では未実行（変更は allow default を残した保守的なもの）。
 #
 # 環境変数 GOLF_SANDBOX で切り替えます。
 #   auto (既定) : 使えるサンドボックスを使う。どちらも無ければエラーにする（黙って素で動かさない）
@@ -47,6 +49,9 @@ module GolfSandbox
   # 大きな標準入力を子が読まないまま眠ると、書き込みがパイプでブロックするため、
   # 書き込みが終わってから計時すると制限が効かない。
   def run(ruby_args, input, time_limit:)
+    # setsid した孫はプロセスグループの外に出る。Linux ではこのプロセスを subreaper にして、
+    # 親が死んだあとに引き取り、制限時間のうちに kill する。macOS に相当する API は無く、未確認。
+    enable_child_subreaper
     Dir.mktmpdir("golf-run") do |tmp|
       tmp = File.realpath(tmp)
       # 解答ファイルは実行用の一時ディレクトリへ移す。サンドボックスはそこだけを書き込み可能にする。
@@ -70,7 +75,10 @@ module GolfSandbox
           kill_group(th.pid)
           th.join
         end
-        writer.join
+        # setsid した孫はグループの外にいる。親が終わったあと subreaper が引き取り、ここで止める。
+        # パイプを持ったままだと、出力の読み取りが孫の終了までブロックする。
+        sweep_orphans
+        writer.join(wait_slice(deadline, 1))
         hit_limit = limit_lock.synchronize { limited }
         status = if hit_limit
           :output_limit
@@ -79,7 +87,8 @@ module GolfSandbox
         else
           th.value.success? ? :ok : :runtime_error
         end
-        [status, out.value, err.value]
+        grace = wait_slice(deadline, 0.5)
+        [status, finish_reader(out, stdout, grace), finish_reader(err, stderr, grace)]
       end
     end
   end
@@ -112,6 +121,60 @@ module GolfSandbox
       stdin.close
     rescue IOError
       nil
+    end
+  end
+
+  def wait_slice(deadline, extra)
+    left = deadline - monotonic
+    (left.positive? ? left : 0) + extra
+  end
+
+  def finish_reader(thread, io, seconds)
+    return thread.value if thread.join(seconds)
+
+    io.close rescue nil
+    thread.join(0.5)
+    thread.alive? ? +"".b : thread.value
+  end
+
+  # Linux だけ。PR_SET_CHILD_SUBREAPER = 36。失敗しても実行自体は続ける。
+  def enable_child_subreaper
+    return unless RUBY_PLATFORM.include?("linux")
+    return if defined?(@subreaper) && @subreaper
+
+    require "fiddle"
+    libc = Fiddle.dlopen(nil)
+    prctl = Fiddle::Function.new(
+      libc["prctl"],
+      [Fiddle::TYPE_INT, Fiddle::TYPE_ULONG, Fiddle::TYPE_ULONG, Fiddle::TYPE_ULONG, Fiddle::TYPE_ULONG],
+      Fiddle::TYPE_INT,
+    )
+    @subreaper = prctl.call(36, 1, 0, 0, 0) == 0
+  end
+
+  def direct_child_pids
+    return [] unless RUBY_PLATFORM.include?("linux")
+
+    mine = Process.pid
+    Dir["/proc/[0-9]*/status"].filter_map do |path|
+      text = File.read(path) rescue next
+      next unless text.match?(/^PPid:\t#{mine}$/)
+
+      path.split("/")[2].to_i
+    end
+  end
+
+  def sweep_orphans
+    return unless RUBY_PLATFORM.include?("linux")
+
+    20.times do
+      kids = direct_child_pids
+      break if kids.empty?
+
+      kids.each do |pid|
+        Process.kill("KILL", pid) rescue nil
+        Process.waitpid(pid) rescue nil
+      end
     end
   end
 
@@ -163,14 +226,10 @@ module GolfSandbox
     when :bwrap
       [env, *bwrap_argv(tmp), "--chdir", tmp, *cmd]
     when :seatbelt
-      deny = hidden_paths.map { %((subpath "#{_1}")) }.join(" ")
-      profile = <<~SB
-        (version 1)
-        (allow default)
-        (deny network*)
-        (deny file-read* file-write* #{deny})
-      SB
-      [env, "sandbox-exec", "-p", profile, *cmd]
+      # macOS では未実行。allow default は Ruby の読み取り（実行ファイルと dylib）を壊さないために残す。
+      # 書き込みは実行ディレクトリ以外を拒否し、process-exec は ruby 以外を拒否する。
+      # seatbelt は allow default より具体的な deny / allow が勝つ、という前提。
+      [env, "sandbox-exec", "-p", seatbelt_profile(tmp), *cmd]
     end
   end
 
@@ -252,6 +311,25 @@ module GolfSandbox
 
     true
   end
+
+  def seatbelt_profile(tmp)
+    ruby_paths = [RbConfig.ruby, File.realpath(RbConfig.ruby)].uniq
+    write_ok = %((subpath "#{sb_quote(File.realpath(tmp))}"))
+    exec_ok = ruby_paths.map { %((literal "#{sb_quote(_1)}")) }.join(" ")
+    hidden = hidden_paths.map { %((subpath "#{sb_quote(_1)}")) }.join(" ")
+    <<~SB
+      (version 1)
+      (allow default)
+      (deny network*)
+      (deny file-write*)
+      (allow file-write* #{write_ok})
+      (deny file-read* file-write* #{hidden})
+      (deny process-exec*)
+      (allow process-exec #{exec_ok})
+    SB
+  end
+
+  def sb_quote(path) = path.gsub("\\", "\\\\").gsub('"', '\\"')
 
   def masked_by_empty_home?(path)
     %w[/home /root /tmp].any? { |mask| path == mask || path.start_with?(mask + "/") }
