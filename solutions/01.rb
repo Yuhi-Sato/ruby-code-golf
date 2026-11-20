@@ -1,1 +1,1 @@
-s=?1;gets.to_i.times{puts s;s=s.gsub(/(.)\1*/){"#{$&.size}"+$1}}
+$<.map{|l|n=l.to_i;puts"正"*(n/5)+%w[一 丅 下 止][n%5-1].to_s*(n%5<=>0)}

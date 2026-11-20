@@ -1,0 +1,17 @@
+class Greeter
+  def initialize(names)
+    @names = names
+  end
+
+  def greet
+    @names.each do |name|
+      if name.empty?
+        next
+      elsif name == "Matz"
+        puts "Thank you, #{name}"
+      else
+        puts "Hi, #{name}"
+      end
+    end
+  end
+end

@@ -1,0 +1,1 @@
+a=$<.map &:chomp;m=a.map(&:size).max;puts a.map{_1.ljust(m).reverse.tr"()[]{}<>/\\\\bdpq",")(][}{><\\\\/dbqp"}

@@ -1,0 +1,1 @@
+a=gets.split;$<.map{_1.scan(/-/){k=$~.begin(0)/2;a[k],a[k+1]=a[k+1],a[k]}};puts a*" "

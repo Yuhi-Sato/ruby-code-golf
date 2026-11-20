@@ -12,8 +12,10 @@ require "open3"
 require "timeout"
 
 TIME_LIMIT = 5
+ENV_UTF8 = { "LANG" => "C.UTF-8", "LC_ALL" => "C.UTF-8" }
+Encoding.default_external = Encoding::UTF_8
 
-def normalize(s) = s.lines.map(&:rstrip).join("\n").rstrip
+def normalize(s) = s.dup.force_encoding(Encoding::UTF_8).scrub.lines.map(&:rstrip).join("\n").rstrip
 
 def score(path)
   src = File.binread(path)
@@ -35,7 +37,7 @@ cases.each do |input_path|
   name = File.basename(input_path, ".in")
   expected = File.read(input_path.sub(/\.in\z/, ".out"))
   actual, err, status = Timeout.timeout(TIME_LIMIT) do
-    Open3.capture3(RbConfig.ruby, solution, stdin_data: File.read(input_path))
+    Open3.capture3(ENV_UTF8, RbConfig.ruby, solution, stdin_data: File.read(input_path))
   end
 
   if status.success? && normalize(actual) == normalize(expected)

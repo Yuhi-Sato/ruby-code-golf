@@ -1,0 +1,13 @@
+begin
+  i = 0
+  while i < 3
+    3.times do |j|
+      puts i * j unless j.zero?
+    end
+    i += 1
+  end
+rescue => e
+  warn e.message
+ensure
+  puts "done"
+end

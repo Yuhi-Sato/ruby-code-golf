@@ -1,0 +1,12 @@
+module YAPC
+    def self.score(code)
+ case code.size
+     when 0..50
+     :eagle
+    when 51..100
+      :birdie
+     else
+    :bogey
+  end
+  end
+    end

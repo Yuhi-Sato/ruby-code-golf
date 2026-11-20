@@ -1,1 +1,1 @@
-n=gets.to_i;(1-n...n).map{|i|puts" "*i.abs+"#{(10**(n-i.abs)/9)**2}"}
+n=gets.to_i;puts (0..n).map{_1%10<1??|:_1%5<1??::?.}*"",(0..n).step(10).map{"%-10d"%_1}*""
